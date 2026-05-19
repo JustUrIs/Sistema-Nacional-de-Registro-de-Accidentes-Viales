@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RUAT – Visualizador de Schema SQL</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #232636;
+    --border: #2e3350;
+    --accent: #4f8ef7;
+    --accent2: #7c5cfc;
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --red: #f87171;
+    --orange: #fb923c;
+    --text: #e2e8f0;
+    --muted: #8892a8;
+    --pk: #fbbf24;
+    --fk: #60a5fa;
+    --check: #34d399;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── TOP BAR ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 28px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  header .logo {
+    font-size: 1.1rem; font-weight: 700;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  }
+  header .subtitle { font-size: .8rem; color: var(--muted); }
+  header .spacer { flex: 1; }
+  .legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+  .legend-item { display: flex; align-items: center; gap: 5px; font-size: .75rem; color: var(--muted); }
+  .legend-dot { width: 10px; height: 10px; border-radius: 2px; }
+
+  /* ── TABS ── */
+  .tabs {
+    display: flex;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px;
+    gap: 2px;
+  }
+  .tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    font-size: .85rem;
+    color: var(--muted);
+    transition: all .15s;
+    user-select: none;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── PANELS ── */
+  .panel { display: none; padding: 24px 28px; }
+  .panel.active { display: block; }
+
+  /* ── SEARCH ── */
+  .search-bar {
+    display: flex; gap: 10px; margin-bottom: 20px; align-items: center;
+  }
+  .search-bar input {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); border-radius: 8px; padding: 8px 14px;
+    font-size: .85rem; width: 260px; outline: none;
+    transition: border-color .15s;
+  }
+  .search-bar input:focus { border-color: var(--accent); }
+  .stats { font-size: .8rem; color: var(--muted); }
+
+  /* ── TABLE GRID ── */
+  #tables-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(310px, 1fr));
+    gap: 16px;
+  }
+  .table-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color .18s, transform .18s, box-shadow .18s;
+    cursor: pointer;
+  }
+  .table-card:hover, .table-card.selected {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(79,142,247,.15);
+    transform: translateY(-2px);
+  }
+  .table-card.dim { opacity: .35; }
+  .table-card.related { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(124,92,252,.18); }
+
+  .card-header {
+    padding: 12px 16px;
+    display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-header .icon {
+    width: 28px; height: 28px; border-radius: 7px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .icon-entity { background: rgba(79,142,247,.18); }
+  .icon-assoc  { background: rgba(124,92,252,.18); }
+  .card-title {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: .88rem; font-weight: 700; letter-spacing: .02em;
+  }
+  .card-badge {
+    margin-left: auto;
+    background: rgba(79,142,247,.14);
+    color: var(--accent);
+    font-size: .68rem; font-weight: 600; border-radius: 4px;
+    padding: 2px 7px;
+  }
+
+  .col-list { padding: 8px 0; }
+  .col-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 16px; font-size: .8rem; font-family: 'Consolas', monospace;
+    transition: background .1s;
+  }
+  .col-row:hover { background: rgba(255,255,255,.03); }
+  .col-tag {
+    font-size: .64rem; font-weight: 700; border-radius: 3px;
+    padding: 1px 5px; flex-shrink: 0; min-width: 26px; text-align: center;
+  }
+  .tag-pk  { background: rgba(251,191,36,.18); color: var(--pk); }
+  .tag-fk  { background: rgba(96,165,250,.18);  color: var(--fk); }
+  .tag-chk { background: rgba(52,211,153,.12);  color: var(--check); }
+  .col-name { flex: 1; color: var(--text); }
+  .col-type { color: var(--muted); font-size: .74rem; }
+  .col-nullable { font-size: .68rem; color: #555; margin-left: 2px; }
+
+  .card-footer {
+    padding: 8px 16px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .fk-chip {
+    font-size: .7rem; color: var(--fk);
+    background: rgba(96,165,250,.1);
+    border-radius: 4px; padding: 2px 8px;
+    cursor: pointer; transition: background .13s;
+  }
+  .fk-chip:hover { background: rgba(96,165,250,.22); }
+
+  /* ── RELATIONS PANEL ── */
+  #relations-list { display: flex; flex-direction: column; gap: 10px; }
+  .rel-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px;
+    display: flex; align-items: center; gap: 14px;
+    font-size: .85rem; cursor: pointer; transition: border-color .15s;
+  }
+  .rel-card:hover { border-color: var(--accent); }
+  .rel-from, .rel-to {
+    font-family: monospace; font-weight: 700;
+    background: var(--surface2); border-radius: 6px;
+    padding: 3px 10px; font-size: .82rem;
+  }
+  .rel-arrow {
+    display: flex; align-items: center; gap: 6px;
+    color: var(--muted); flex: 1; justify-content: center;
+  }
+  .rel-line {
+    flex: 1; height: 1px; background: var(--border);
+    position: relative;
+  }
+  .card-rel { background: rgba(251,191,36,.1); color: var(--yellow); font-size: .7rem; border-radius: 4px; padding: 1px 7px; }
+  .card-rel-n { background: rgba(79,142,247,.1); color: var(--accent); font-size: .7rem; border-radius: 4px; padding: 1px 7px; }
+
+  /* ── SQL VIEWER ── */
+  #sql-viewer {
+    display: grid;
+    grid-template-columns: 220px 1fr;
+    gap: 16px; height: calc(100vh - 160px);
+  }
+  .sql-sidebar {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow-y: auto; padding: 8px 0;
+  }
+  .sql-item {
+    padding: 9px 16px; cursor: pointer; font-size: .8rem;
+    font-family: monospace; color: var(--muted);
+    border-left: 2px solid transparent; transition: all .13s;
+  }
+  .sql-item:hover { background: var(--surface2); color: var(--text); }
+  .sql-item.active { border-left-color: var(--accent); color: var(--accent); background: rgba(79,142,247,.07); }
+  .sql-section { padding: 14px 16px 4px; font-size: .68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .sql-code {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; overflow: auto; padding: 20px 24px;
+    font-family: 'Consolas','Courier New', monospace; font-size: .82rem;
+    line-height: 1.65; color: var(--text);
+    white-space: pre;
+  }
+  /* SQL syntax highlight */
+  .kw  { color: #7c9ef8; font-weight: 600; }
+  .ty  { color: #e5c07b; }
+  .cm  { color: #5c6370; font-style: italic; }
+  .st  { color: #98c379; }
+  .nm  { color: #d19a66; }
+  .cn  { color: #e06c75; }
+
+  /* ── STATS PANEL ── */
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 14px; margin-bottom: 24px;
+  }
+  .stat-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 10px; padding: 18px 20px;
+  }
+  .stat-num { font-size: 2rem; font-weight: 800; color: var(--accent); }
+  .stat-label { font-size: .8rem; color: var(--muted); margin-top: 2px; }
+  .bar-chart { margin-top: 20px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+  .bar-name { font-family: monospace; font-size: .76rem; color: var(--muted); min-width: 200px; }
+  .bar-bg { flex: 1; background: var(--surface2); border-radius: 4px; height: 18px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center;
+    padding-left: 8px; font-size: .7rem; font-weight: 700; color: #fff; transition: width .5s ease; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <div class="logo">🗄 RUAT Schema Viewer</div>
+    <div class="subtitle">Registro Único de Accidentes de Tránsito · TD7 Ingeniería de Datos</div>
+  </div>
+  <div class="spacer"></div>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#fbbf24"></div>PK</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#60a5fa"></div>FK</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#34d399"></div>CHECK</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#4f8ef7;border-radius:50%"></div>Entidad</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7c5cfc;border-radius:50%"></div>Asociativa</div>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" onclick="showPanel('tables')">📋 Tablas</div>
+  <div class="tab" onclick="showPanel('sql')">💻 SQL</div>
+  <div class="tab" onclick="showPanel('queries')">🔍 Consultas</div>
+</div>
+
+<!-- PANEL: TABLES -->
+<div class="panel active" id="panel-tables">
+  <div class="search-bar">
+    <input type="text" id="search" placeholder="🔍 Buscar tabla o columna…" oninput="filterTables(this.value)">
+    <span class="stats" id="count-label"></span>
+    <span class="stats" style="margin-left:10px; color: var(--muted); font-size:.78rem;">
+      Click en una tabla para ver relaciones · Click en FK para navegar
+    </span>
+  </div>
+  <div id="tables-grid"></div>
+</div>
+
+</div>
+
+<!-- PANEL: SQL -->
+<div class="panel" id="panel-sql">
+  <div id="sql-viewer">
+    <div class="sql-sidebar" id="sql-sidebar"></div>
+    <div class="sql-code" id="sql-code">Seleccioná una tabla para ver su DDL.</div>
+  </div>
+</div>
+
+
+
+<!-- PANEL: QUERIES -->
+<div class="panel" id="panel-queries">
+  <div style="display:grid; grid-template-columns:260px 1fr; gap:16px; height:calc(100vh - 160px);">
+    <div class="sql-sidebar" id="queries-sidebar"></div>
+    <div style="display:flex; flex-direction:column; gap:0; min-width:0; overflow:hidden;">
+      <div style="display:flex; align-items:center; gap:10px; background:var(--surface2); border:1px solid var(--border); border-radius:10px 10px 0 0; padding:8px 18px; border-bottom:none;">
+        <div id="query-desc" style="flex:1; font-size:.8rem; color:var(--muted);"></div>
+        <button id="btn-copy" onclick="copyQuery()" style="background:rgba(79,142,247,.15); border:1px solid rgba(79,142,247,.3); color:var(--accent); border-radius:6px; padding:4px 12px; font-size:.75rem; cursor:pointer; transition:all .15s; white-space:nowrap;">📋 Copiar</button>
+      </div>
+      <div class="sql-code" id="query-code" style="border-radius:0 0 10px 10px; flex:1; overflow:auto; white-space:pre-wrap;">Seleccioná una consulta.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════════════
+// DATA MODEL
+// ════════════════════════════════════════════════════════════
+const TABLES = [
+  {
+    name: 'tramo_vial', type: 'entity',
+    pk: ['id_tramo'],
+    cols: [
+      { name: 'id_tramo',     type: 'SERIAL',        pk: true,  nullable: false },
+      { name: 'descripcion',  type: 'VARCHAR(120)',   nullable: false },
+      { name: 'tipo_camino',  type: 'VARCHAR(30)',    nullable: false, check: "IN ('autopista','avenida','calle','ruta','camino_rural')" },
+      { name: 'jurisdiccion', type: 'VARCHAR(80)',    nullable: false },
+      { name: 'longitud_km',  type: 'NUMERIC(8,2)',   nullable: false, check: '> 0' },
+    ],
+    fks: [],
+    ddl: `CREATE TABLE tramo_vial (
+    id_tramo     SERIAL PRIMARY KEY,
+    descripcion  VARCHAR(120) NOT NULL,
+    tipo_camino  VARCHAR(30)  NOT NULL,
+    jurisdiccion VARCHAR(80)  NOT NULL,
+    longitud_km  NUMERIC(8,2) NOT NULL CHECK (longitud_km > 0),
+    CHECK (tipo_camino IN (
+        'autopista','avenida','calle','ruta','camino_rural'))
+);`
+  },
+  {
+    name: 'persona', type: 'entity',
+    pk: ['id_persona'],
+    cols: [
+      { name: 'id_persona',       type: 'SERIAL',       pk: true,  nullable: false },
+      { name: 'tipo_doc',         type: 'VARCHAR(20)',   nullable: false },
+      { name: 'nro_doc',          type: 'VARCHAR(20)',   nullable: false, check: 'UNIQUE' },
+      { name: 'nombre',           type: 'VARCHAR(60)',   nullable: false },
+      { name: 'apellido',         type: 'VARCHAR(60)',   nullable: false },
+      { name: 'fecha_nacimiento', type: 'DATE',          nullable: true  },
+      { name: 'domicilio',        type: 'VARCHAR(150)',  nullable: true  },
+      { name: 'telefono',         type: 'VARCHAR(30)',   nullable: true  },
+    ],
+    fks: [],
+    ddl: `CREATE TABLE persona (
+    id_persona       SERIAL PRIMARY KEY,
+    tipo_doc         VARCHAR(20)  NOT NULL,
+    nro_doc          VARCHAR(20)  NOT NULL UNIQUE,
+    nombre           VARCHAR(60)  NOT NULL,
+    apellido         VARCHAR(60)  NOT NULL,
+    fecha_nacimiento DATE,
+    domicilio        VARCHAR(150),
+    telefono         VARCHAR(30)
+);`
+  },
+  {
+    name: 'aseguradora', type: 'entity',
+    pk: ['id_aseguradora'],
+    cols: [
+      { name: 'id_aseguradora', type: 'SERIAL',       pk: true,  nullable: false },
+      { name: 'nombre',         type: 'VARCHAR(100)',  nullable: false, check: 'UNIQUE' },
+      { name: 'telefono',       type: 'VARCHAR(30)',   nullable: true  },
+      { name: 'domicilio',      type: 'VARCHAR(150)',  nullable: true  },
+    ],
+    fks: [],
+    ddl: `CREATE TABLE aseguradora (
+    id_aseguradora SERIAL PRIMARY KEY,
+    nombre         VARCHAR(100) NOT NULL UNIQUE,
+    telefono       VARCHAR(30),
+    domicilio      VARCHAR(150)
+);`
+  },
+  {
+    name: 'vehiculo', type: 'entity',
+    pk: ['patente'],
+    cols: [
+      { name: 'patente',        type: 'VARCHAR(10)',  pk: true,  nullable: false },
+      { name: 'vin',            type: 'VARCHAR(30)',  nullable: true,  check: 'UNIQUE' },
+      { name: 'marca',          type: 'VARCHAR(50)',  nullable: false },
+      { name: 'modelo',         type: 'VARCHAR(50)',  nullable: false },
+      { name: 'anio_modelo',    type: 'INTEGER',      nullable: false, check: 'BETWEEN 1950 AND 2035' },
+      { name: 'tipo_vehiculo',  type: 'VARCHAR(30)',  nullable: false, check: "IN ('auto','moto','camioneta','camion','colectivo','bicicleta')" },
+      { name: 'categoria',      type: 'VARCHAR(30)',  nullable: false, check: "IN ('gama_baja','gama_media','gama_alta','utilitario','carga','otro')" },
+      { name: 'tipo_cobertura', type: 'VARCHAR(30)',  nullable: false, check: "IN ('amplia','terceros','responsabilidad_civil')" },
+      { name: 'id_aseguradora', type: 'INTEGER',      fk: 'aseguradora.id_aseguradora', nullable: false },
+    ],
+    fks: [{ col: 'id_aseguradora', ref: 'aseguradora', refCol: 'id_aseguradora' }],
+    ddl: `CREATE TABLE vehiculo (
+    patente        VARCHAR(10) PRIMARY KEY,
+    vin            VARCHAR(30) UNIQUE,
+    marca          VARCHAR(50) NOT NULL,
+    modelo         VARCHAR(50) NOT NULL,
+    anio_modelo    INTEGER     NOT NULL
+                   CHECK (anio_modelo BETWEEN 1950 AND 2035),
+    tipo_vehiculo  VARCHAR(30) NOT NULL
+                   CHECK (tipo_vehiculo IN (
+                       'auto','moto','camioneta',
+                       'camion','colectivo','bicicleta')),
+    categoria      VARCHAR(30) NOT NULL
+                   CHECK (categoria IN (
+                       'gama_baja','gama_media','gama_alta',
+                       'utilitario','carga','otro')),
+    tipo_cobertura VARCHAR(30) NOT NULL
+                   CHECK (tipo_cobertura IN (
+                       'amplia','terceros','responsabilidad_civil')),
+    id_aseguradora INTEGER NOT NULL,
+    FOREIGN KEY (id_aseguradora) REFERENCES aseguradora(id_aseguradora)
+);`
+  },
+  {
+    name: 'siniestro', type: 'entity',
+    pk: ['id_siniestro'],
+    cols: [
+      { name: 'id_siniestro',          type: 'SERIAL',       pk: true,  nullable: false },
+      { name: 'fecha',                  type: 'DATE',          nullable: false },
+      { name: 'hora',                   type: 'TIME',          nullable: false },
+      { name: 'id_tramo',               type: 'INTEGER',       fk: 'tramo_vial.id_tramo', nullable: false },
+      { name: 'referencia_lugar',       type: 'VARCHAR(150)',  nullable: false },
+      { name: 'nro_denuncia_policial',  type: 'VARCHAR(40)',   nullable: true  },
+      { name: 'tipo_accidente',         type: 'VARCHAR(40)',   nullable: false, check: "IN ('colision_multiple','atropello','despiste',…)" },
+      { name: 'tipo_colision',          type: 'VARCHAR(40)',   nullable: false, check: "IN ('vehiculo','peaton','edificio',…)" },
+    ],
+    fks: [{ col: 'id_tramo', ref: 'tramo_vial', refCol: 'id_tramo' }],
+    ddl: `CREATE TABLE siniestro (
+    id_siniestro          SERIAL PRIMARY KEY,
+    fecha                 DATE        NOT NULL,
+    hora                  TIME        NOT NULL,
+    id_tramo              INTEGER     NOT NULL,
+    referencia_lugar      VARCHAR(150) NOT NULL,
+    nro_denuncia_policial VARCHAR(40),
+    tipo_accidente        VARCHAR(40) NOT NULL
+        CHECK (tipo_accidente IN (
+            'colision_multiple','atropello','despiste',
+            'colision_lateral','colision_frontal',
+            'vuelco','incendio','otro')),
+    tipo_colision         VARCHAR(40) NOT NULL
+        CHECK (tipo_colision IN (
+            'vehiculo','peaton','edificio','poste',
+            'guardarail','animal','otro')),
+    FOREIGN KEY (id_tramo) REFERENCES tramo_vial(id_tramo)
+);`
+  },
+  {
+    name: 'informe_tecnico', type: 'entity',
+    pk: ['id_informe'],
+    cols: [
+      { name: 'id_informe',              type: 'SERIAL',       pk: true,  nullable: false },
+      { name: 'id_siniestro',            type: 'INTEGER',      fk: 'siniestro.id_siniestro', nullable: false },
+      { name: 'fecha_informe',           type: 'DATE',          nullable: false },
+      { name: 'organismo_emisor',        type: 'VARCHAR(100)',  nullable: false },
+      { name: 'funcionario_responsable', type: 'VARCHAR(100)',  nullable: false },
+      { name: 'hipotesis_hecho',         type: 'TEXT',          nullable: true  },
+      { name: 'causa_probable',          type: 'VARCHAR(100)',  nullable: true  },
+      { name: 'falla_humana_probable',   type: 'VARCHAR(100)',  nullable: true  },
+      { name: 'tipo_pavimento',          type: 'VARCHAR(40)',   nullable: true  },
+      { name: 'estado_via',              type: 'VARCHAR(40)',   nullable: true  },
+      { name: 'iluminacion',             type: 'VARCHAR(40)',   nullable: true  },
+      { name: 'condicion_climatica',     type: 'VARCHAR(40)',   nullable: true  },
+      { name: 'seguridad_peatonal',      type: 'BOOLEAN',       nullable: true  },
+    ],
+    fks: [{ col: 'id_siniestro', ref: 'siniestro', refCol: 'id_siniestro' }],
+    ddl: `CREATE TABLE informe_tecnico (
+    id_informe              SERIAL PRIMARY KEY,
+    id_siniestro            INTEGER      NOT NULL,
+    fecha_informe           DATE         NOT NULL,
+    organismo_emisor        VARCHAR(100) NOT NULL,
+    funcionario_responsable VARCHAR(100) NOT NULL,
+    hipotesis_hecho         TEXT,
+    causa_probable          VARCHAR(100),
+    falla_humana_probable   VARCHAR(100),
+    tipo_pavimento          VARCHAR(40),
+    estado_via              VARCHAR(40),
+    iluminacion             VARCHAR(40),
+    condicion_climatica     VARCHAR(40),
+    seguridad_peatonal      BOOLEAN,
+    FOREIGN KEY (id_siniestro) REFERENCES siniestro(id_siniestro)
+);`
+  },
+  {
+    name: 'licencia', type: 'entity',
+    pk: ['id_licencia'],
+    cols: [
+      { name: 'id_licencia',       type: 'SERIAL',      pk: true,  nullable: false },
+      { name: 'id_persona',        type: 'INTEGER',     fk: 'persona.id_persona', nullable: false },
+      { name: 'nro_licencia',      type: 'VARCHAR(40)',  nullable: false, check: 'UNIQUE' },
+      { name: 'clase',             type: 'VARCHAR(20)',  nullable: false },
+      { name: 'fecha_emision',     type: 'DATE',         nullable: false },
+      { name: 'fecha_vencimiento', type: 'DATE',         nullable: false, check: '> fecha_emision' },
+      { name: 'estado',            type: 'VARCHAR(20)',  nullable: false, check: "IN ('vigente','vencida','suspendida')" },
+    ],
+    fks: [{ col: 'id_persona', ref: 'persona', refCol: 'id_persona' }],
+    ddl: `CREATE TABLE licencia (
+    id_licencia       SERIAL PRIMARY KEY,
+    id_persona        INTEGER     NOT NULL,
+    nro_licencia      VARCHAR(40) NOT NULL UNIQUE,
+    clase             VARCHAR(20) NOT NULL,
+    fecha_emision     DATE        NOT NULL,
+    fecha_vencimiento DATE        NOT NULL
+        CHECK (fecha_vencimiento > fecha_emision),
+    estado            VARCHAR(20) NOT NULL
+        CHECK (estado IN ('vigente','vencida','suspendida')),
+    FOREIGN KEY (id_persona) REFERENCES persona(id_persona)
+);`
+  },
+  {
+    name: 'infraccion', type: 'entity',
+    pk: ['id_infraccion'],
+    cols: [
+      { name: 'id_infraccion',  type: 'SERIAL',       pk: true,  nullable: false },
+      { name: 'id_persona',     type: 'INTEGER',      fk: 'persona.id_persona', nullable: false },
+      { name: 'fecha',          type: 'DATE',          nullable: false },
+      { name: 'tipo_infraccion',type: 'VARCHAR(60)',   nullable: false },
+      { name: 'descripcion',    type: 'VARCHAR(200)',  nullable: true  },
+      { name: 'jurisdiccion',   type: 'VARCHAR(80)',   nullable: true  },
+      { name: 'monto',          type: 'NUMERIC(10,2)', nullable: true,  check: '>= 0' },
+      { name: 'estado',         type: 'VARCHAR(20)',   nullable: false, check: "IN ('pendiente','pagada','apelada')" },
+    ],
+    fks: [{ col: 'id_persona', ref: 'persona', refCol: 'id_persona' }],
+    ddl: `CREATE TABLE infraccion (
+    id_infraccion  SERIAL PRIMARY KEY,
+    id_persona     INTEGER       NOT NULL,
+    fecha          DATE          NOT NULL,
+    tipo_infraccion VARCHAR(60)  NOT NULL,
+    descripcion    VARCHAR(200),
+    jurisdiccion   VARCHAR(80),
+    monto          NUMERIC(10,2) CHECK (monto >= 0),
+    estado         VARCHAR(20)   NOT NULL
+        CHECK (estado IN ('pendiente','pagada','apelada')),
+    FOREIGN KEY (id_persona) REFERENCES persona(id_persona)
+);`
+  },
+  {
+    name: 'antecedente_penal', type: 'entity',
+    pk: ['id_antecedente'],
+    cols: [
+      { name: 'id_antecedente', type: 'SERIAL',       pk: true,  nullable: false },
+      { name: 'id_persona',     type: 'INTEGER',      fk: 'persona.id_persona', nullable: false },
+      { name: 'fecha',          type: 'DATE',          nullable: false },
+      { name: 'caratula',       type: 'VARCHAR(120)',  nullable: false },
+      { name: 'organismo',      type: 'VARCHAR(120)',  nullable: true  },
+      { name: 'observaciones',  type: 'VARCHAR(200)',  nullable: true  },
+    ],
+    fks: [{ col: 'id_persona', ref: 'persona', refCol: 'id_persona' }],
+    ddl: `CREATE TABLE antecedente_penal (
+    id_antecedente SERIAL PRIMARY KEY,
+    id_persona     INTEGER       NOT NULL,
+    fecha          DATE          NOT NULL,
+    caratula       VARCHAR(120)  NOT NULL,
+    organismo      VARCHAR(120),
+    observaciones  VARCHAR(200),
+    FOREIGN KEY (id_persona) REFERENCES persona(id_persona)
+);`
+  },
+  {
+    name: 'habilitacion_conduccion', type: 'assoc',
+    pk: ['id_persona','patente','fecha_desde'],
+    cols: [
+      { name: 'id_persona',  type: 'INTEGER',     pk: true, fk: 'persona.id_persona',  nullable: false },
+      { name: 'patente',     type: 'VARCHAR(10)', pk: true, fk: 'vehiculo.patente',     nullable: false },
+      { name: 'fecha_desde', type: 'DATE',        pk: true, nullable: false },
+      { name: 'fecha_hasta', type: 'DATE',        nullable: true, check: 'IS NULL OR > fecha_desde' },
+    ],
+    fks: [
+      { col: 'id_persona', ref: 'persona',  refCol: 'id_persona' },
+      { col: 'patente',    ref: 'vehiculo', refCol: 'patente'    },
+    ],
+    ddl: `CREATE TABLE habilitacion_conduccion (
+    id_persona  INTEGER     NOT NULL,
+    patente     VARCHAR(10) NOT NULL,
+    fecha_desde DATE        NOT NULL,
+    fecha_hasta DATE,
+    PRIMARY KEY (id_persona, patente, fecha_desde),
+    FOREIGN KEY (id_persona) REFERENCES persona(id_persona),
+    FOREIGN KEY (patente)    REFERENCES vehiculo(patente),
+    CHECK (fecha_hasta IS NULL OR fecha_hasta > fecha_desde)
+);`
+  },
+  {
+    name: 'vehiculo_involucrado', type: 'assoc',
+    pk: ['id_siniestro','patente'],
+    cols: [
+      { name: 'id_siniestro',  type: 'INTEGER',      pk: true, fk: 'siniestro.id_siniestro', nullable: false },
+      { name: 'patente',       type: 'VARCHAR(10)',   pk: true, fk: 'vehiculo.patente',        nullable: false },
+      { name: 'danio_material',type: 'VARCHAR(100)',  nullable: true },
+      { name: 'observaciones', type: 'VARCHAR(200)',  nullable: true },
+    ],
+    fks: [
+      { col: 'id_siniestro', ref: 'siniestro', refCol: 'id_siniestro' },
+      { col: 'patente',      ref: 'vehiculo',  refCol: 'patente'       },
+    ],
+    ddl: `CREATE TABLE vehiculo_involucrado (
+    id_siniestro   INTEGER     NOT NULL,
+    patente        VARCHAR(10) NOT NULL,
+    danio_material VARCHAR(100),
+    observaciones  VARCHAR(200),
+    PRIMARY KEY (id_siniestro, patente),
+    FOREIGN KEY (id_siniestro) REFERENCES siniestro(id_siniestro),
+    FOREIGN KEY (patente)      REFERENCES vehiculo(patente)
+);`
+  },
+  {
+    name: 'participacion_vehicular', type: 'assoc',
+    pk: ['id_siniestro','id_persona','patente'],
+    cols: [
+      { name: 'id_siniestro',   type: 'INTEGER',     pk: true, fk: 'vehiculo_involucrado.(id_siniestro,patente)', nullable: false },
+      { name: 'id_persona',     type: 'INTEGER',     pk: true, fk: 'persona.id_persona', nullable: false },
+      { name: 'patente',        type: 'VARCHAR(10)', pk: true, fk: 'vehiculo_involucrado.(id_siniestro,patente)', nullable: false },
+      { name: 'rol_ocupante',   type: 'VARCHAR(20)', nullable: false, check: "IN ('conductor','acompaniante')" },
+      { name: 'usa_cinturon',   type: 'BOOLEAN',     nullable: true  },
+      { name: 'condicion_fisica',type:'VARCHAR(40)', nullable: true,  check: "IN ('ileso','lesiones_leves','lesiones_graves','fallecido')" },
+      { name: 'resultado',      type: 'VARCHAR(40)', nullable: true,  check: "IN ('sin_internacion','ambulatorio','internacion','fallecido')" },
+    ],
+    fks: [
+      { col: 'id_persona',  ref: 'persona',               refCol: 'id_persona'   },
+      { col: '(id_siniestro,patente)', ref: 'vehiculo_involucrado', refCol: '(id_siniestro,patente)' },
+    ],
+    ddl: `CREATE TABLE participacion_vehicular (
+    id_siniestro    INTEGER     NOT NULL,
+    id_persona      INTEGER     NOT NULL,
+    patente         VARCHAR(10) NOT NULL,
+    rol_ocupante    VARCHAR(20) NOT NULL
+        CHECK (rol_ocupante IN ('conductor','acompaniante')),
+    usa_cinturon    BOOLEAN,
+    condicion_fisica VARCHAR(40)
+        CHECK (condicion_fisica IN (
+            'ileso','lesiones_leves',
+            'lesiones_graves','fallecido') OR condicion_fisica IS NULL),
+    resultado       VARCHAR(40)
+        CHECK (resultado IN (
+            'sin_internacion','ambulatorio',
+            'internacion','fallecido') OR resultado IS NULL),
+    PRIMARY KEY (id_siniestro, id_persona, patente),
+    FOREIGN KEY (id_persona) REFERENCES persona(id_persona),
+    FOREIGN KEY (id_siniestro, patente)
+        REFERENCES vehiculo_involucrado(id_siniestro, patente)
+);`
+  },
+  {
+    name: 'testimonio', type: 'assoc',
+    pk: ['id_siniestro','id_persona'],
+    cols: [
+      { name: 'id_siniestro',  type: 'INTEGER',      pk: true, fk: 'siniestro.id_siniestro', nullable: false },
+      { name: 'id_persona',    type: 'INTEGER',      pk: true, fk: 'persona.id_persona',      nullable: false },
+      { name: 'declaracion',   type: 'VARCHAR(250)', nullable: true },
+      { name: 'medio_contacto',type: 'VARCHAR(100)', nullable: true },
+    ],
+    fks: [
+      { col: 'id_siniestro', ref: 'siniestro', refCol: 'id_siniestro' },
+      { col: 'id_persona',   ref: 'persona',   refCol: 'id_persona'   },
+    ],
+    ddl: `CREATE TABLE testimonio (
+    id_siniestro   INTEGER NOT NULL,
+    id_persona     INTEGER NOT NULL,
+    declaracion    VARCHAR(250),
+    medio_contacto VARCHAR(100),
+    PRIMARY KEY (id_siniestro, id_persona),
+    FOREIGN KEY (id_siniestro) REFERENCES siniestro(id_siniestro),
+    FOREIGN KEY (id_persona)   REFERENCES persona(id_persona)
+);`
+  },
+  {
+    name: 'victima_no_vehicular', type: 'assoc',
+    pk: ['id_siniestro','id_persona'],
+    cols: [
+      { name: 'id_siniestro',  type: 'INTEGER',     pk: true, fk: 'siniestro.id_siniestro', nullable: false },
+      { name: 'id_persona',    type: 'INTEGER',     pk: true, fk: 'persona.id_persona',      nullable: false },
+      { name: 'tipo_victima',  type: 'VARCHAR(30)', nullable: false, check: "IN ('peaton','ciclista','otro')" },
+      { name: 'condicion_fisica', type: 'VARCHAR(40)', nullable: true, check: "IN ('ileso','lesiones_leves','lesiones_graves','fallecido')" },
+      { name: 'observaciones', type: 'VARCHAR(200)',nullable: true },
+    ],
+    fks: [
+      { col: 'id_siniestro', ref: 'siniestro', refCol: 'id_siniestro' },
+      { col: 'id_persona',   ref: 'persona',   refCol: 'id_persona'   },
+    ],
+    ddl: `CREATE TABLE victima_no_vehicular (
+    id_siniestro    INTEGER     NOT NULL,
+    id_persona      INTEGER     NOT NULL,
+    tipo_victima    VARCHAR(30) NOT NULL
+        CHECK (tipo_victima IN ('peaton','ciclista','otro')),
+    condicion_fisica VARCHAR(40)
+        CHECK (condicion_fisica IN (
+            'ileso','lesiones_leves',
+            'lesiones_graves','fallecido') OR condicion_fisica IS NULL),
+    observaciones   VARCHAR(200),
+    PRIMARY KEY (id_siniestro, id_persona),
+    FOREIGN KEY (id_siniestro) REFERENCES siniestro(id_siniestro),
+    FOREIGN KEY (id_persona)   REFERENCES persona(id_persona)
+);`
+  },
+];
+
+// ════════════════════════════════════════════════════════════
+// UI LOGIC
+// ════════════════════════════════════════════════════════════
+let selectedTable = null;
+
+function showPanel(id) {
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('panel-' + id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+function getRelatedNames(tName) {
+  const t = TABLES.find(x => x.name === tName);
+  if (!t) return new Set();
+  const set = new Set();
+  t.fks.forEach(fk => set.add(fk.ref));
+  TABLES.forEach(other => {
+    if (other.name !== tName) {
+      other.fks.forEach(fk => { if (fk.ref === tName) set.add(other.name); });
+    }
+  });
+  return set;
+}
+
+function renderCard(t) {
+  const pkCols  = t.cols.filter(c => c.pk).map(c => c.name);
+  const pkLabel = pkCols.join(', ');
+  const icon    = t.type === 'entity' ? '🔷' : '🔗';
+  const iconClass = t.type === 'entity' ? 'icon-entity' : 'icon-assoc';
+
+  const colsHtml = t.cols.map(c => {
+    const tags = [];
+    if (c.pk)    tags.push(`<span class="col-tag tag-pk">PK</span>`);
+    if (c.fk)    tags.push(`<span class="col-tag tag-fk">FK</span>`);
+    if (c.check) tags.push(`<span class="col-tag tag-chk" title="${c.check}">✓</span>`);
+    const nullable = c.nullable ? `<span class="col-nullable">?</span>` : '';
+    return `<div class="col-row">
+      ${tags.join('')}
+      <span class="col-name">${c.name}</span>
+      <span class="col-type">${c.type}</span>${nullable}
+    </div>`;
+  }).join('');
+
+  const fkChips = t.fks.map(fk =>
+    `<span class="fk-chip" onclick="navigateTo('${fk.ref}',event)">→ ${fk.ref}</span>`
+  ).join('');
+
+  return `
+  <div class="table-card" id="card-${t.name}" onclick="selectTable('${t.name}')">
+    <div class="card-header">
+      <div class="icon ${iconClass}">${icon}</div>
+      <span class="card-title">${t.name}</span>
+      <span class="card-badge">${t.cols.length} cols</span>
+    </div>
+    <div class="col-list">${colsHtml}</div>
+    ${t.fks.length ? `<div class="card-footer">${fkChips}</div>` : ''}
+  </div>`;
+}
+
+function renderTables(list) {
+  const grid = document.getElementById('tables-grid');
+  grid.innerHTML = list.map(renderCard).join('');
+  document.getElementById('count-label').textContent = `${list.length} tablas`;
+}
+
+function selectTable(name) {
+  const wasSame = selectedTable === name;
+  selectedTable = wasSame ? null : name;
+  const related = selectedTable ? getRelatedNames(selectedTable) : new Set();
+
+  document.querySelectorAll('.table-card').forEach(card => {
+    const n = card.id.replace('card-','');
+    card.classList.remove('selected','related','dim');
+    if (!selectedTable) return;
+    if (n === selectedTable) card.classList.add('selected');
+    else if (related.has(n)) card.classList.add('related');
+    else card.classList.add('dim');
+  });
+}
+
+function navigateTo(name, e) {
+  e.stopPropagation();
+  const card = document.getElementById('card-' + name);
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    selectTable(name);
+  }
+}
+
+function filterTables(q) {
+  q = q.toLowerCase().trim();
+  const filtered = q
+    ? TABLES.filter(t =>
+        t.name.includes(q) || t.cols.some(c => c.name.includes(q) || c.type.toLowerCase().includes(q))
+      )
+    : TABLES;
+  renderTables(filtered);
+}
+
+// ── RELATIONS ────────────────────────────────────────────────
+function renderRelations() {
+  const list = document.getElementById('relations-list');
+  const rels = [];
+  TABLES.forEach(t => {
+    t.fks.forEach(fk => {
+      rels.push({ from: t.name, to: fk.ref, col: fk.col, refCol: fk.refCol });
+    });
+  });
+
+  const colors = ['#4f8ef7','#7c5cfc','#34d399','#fbbf24','#f87171','#fb923c'];
+  list.innerHTML = rels.map((r, i) => {
+    const c = colors[i % colors.length];
+    return `<div class="rel-card" onclick="highlightRel('${r.from}','${r.to}')">
+      <span class="rel-from" style="border: 1.5px solid ${c}40; color:${c}">${r.from}</span>
+      <div class="rel-arrow">
+        <div class="rel-line"></div>
+        <span style="font-size:.75rem; color:var(--muted); white-space:nowrap">
+          .${r.col} → .${r.refCol}
+        </span>
+        <div class="rel-line"></div>
+      </div>
+      <span class="rel-to" style="border: 1.5px solid ${c}40; color:${c}">${r.to}</span>
+    </div>`;
+  }).join('');
+}
+
+function highlightRel(from, to) {
+  showPanel({ target: document.querySelector('.tab') }, 'tables');
+  setTimeout(() => {
+    selectTable(from);
+    document.getElementById('card-' + from)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, 100);
+}
+
+// ── SQL VIEWER ───────────────────────────────────────────────
+function renderSqlSidebar() {
+  const sb = document.getElementById('sql-sidebar');
+  sb.innerHTML = `<div class="sql-section">Entidades</div>` +
+    TABLES.filter(t => t.type === 'entity').map(t =>
+      `<div class="sql-item" onclick="showDDL('${t.name}')">${t.name}</div>`
+    ).join('') +
+    `<div class="sql-section">Asociativas</div>` +
+    TABLES.filter(t => t.type === 'assoc').map(t =>
+      `<div class="sql-item" onclick="showDDL('${t.name}')">${t.name}</div>`
+    ).join('');
+}
+
+function showDDL(name) {
+  document.querySelectorAll('.sql-item').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sql-item').forEach(el => {
+    if (el.textContent === name) el.classList.add('active');
+  });
+  const t = TABLES.find(x => x.name === name);
+  if (!t) return;
+  document.getElementById('sql-code').innerHTML = syntaxHighlight(t.ddl);
+}
+
+function syntaxHighlight(sql) {
+  const keywords = ['CREATE','TABLE','PRIMARY','KEY','FOREIGN','REFERENCES','NOT','NULL',
+    'UNIQUE','CHECK','SERIAL','IN','OR','IS','AND','BETWEEN','DEFAULT'];
+  const types = ['INTEGER','VARCHAR','DATE','TIME','BOOLEAN','NUMERIC','TEXT','SERIAL'];
+  let out = sql
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  // strings
+  out = out.replace(/'([^']*)'/g, `<span class="st">'$1'</span>`);
+  // comments
+  out = out.replace(/--.*/g, m => `<span class="cm">${m}</span>`);
+  // numbers
+  out = out.replace(/\b(\d+)\b/g, `<span class="nm">$1</span>`);
+  // types
+  types.forEach(k => {
+    out = out.replace(new RegExp(`\\b${k}\\b`, 'g'), `<span class="ty">${k}</span>`);
+  });
+  // keywords
+  keywords.forEach(k => {
+    out = out.replace(new RegExp(`\\b${k}\\b`, 'g'), `<span class="kw">${k}</span>`);
+  });
+  return out;
+}
+
+// ── STATS ────────────────────────────────────────────────────
+function renderStats() {
+  const totalCols = TABLES.reduce((s, t) => s + t.cols.length, 0);
+  const totalFKs  = TABLES.reduce((s, t) => s + t.fks.length, 0);
+  const totalCHK  = TABLES.reduce((s, t) => s + t.cols.filter(c => c.check).length, 0);
+  const assocCount = TABLES.filter(t => t.type === 'assoc').length;
+
+  document.getElementById('stats-grid').innerHTML = [
+    { n: TABLES.length,   l: 'Tablas totales' },
+    { n: TABLES.filter(t=>t.type==='entity').length, l: 'Entidades' },
+    { n: assocCount,      l: 'Tablas asociativas' },
+    { n: totalCols,       l: 'Columnas totales' },
+    { n: totalFKs,        l: 'Claves foráneas (FK)' },
+    { n: totalCHK,        l: 'Constraints CHECK' },
+  ].map(s => `<div class="stat-card">
+    <div class="stat-num">${s.n}</div>
+    <div class="stat-label">${s.l}</div>
+  </div>`).join('');
+
+  const sorted = [...TABLES].sort((a,b) => b.cols.length - a.cols.length);
+  const max = sorted[0].cols.length;
+  const barColors = ['#4f8ef7','#7c5cfc','#34d399','#fbbf24','#fb923c','#f87171'];
+  document.getElementById('bar-chart').innerHTML = sorted.map((t, i) => {
+    const pct = Math.round((t.cols.length / max) * 100);
+    const color = barColors[i % barColors.length];
+    return `<div class="bar-row">
+      <div class="bar-name">${t.name}</div>
+      <div class="bar-bg">
+        <div class="bar-fill" style="width:${pct}%; background:${color}">${t.cols.length}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── INIT ─────────────────────────────────────────────────────
+renderTables(TABLES);
+renderSqlSidebar();
+
+// ── CONSULTAS ──────────────────────────────────────────────
+var QUERIES = [
+  {
+    "title": "1. Listado general de siniestros con su tramo vial",
+    "desc": "Permite obtener un resumen cronológico de todos los hechos registrados junto con la descripción de la vía donde ocurrieron.",
+    "sql": "SELECT\n    s.id_siniestro,\n    s.fecha,\n    s.hora,\n    s.tipo_accidente,\n    s.tipo_colision,\n    t.descripcion   AS tramo,\n    t.tipo_camino,\n    t.jurisdiccion\nFROM SINIESTRO AS s\nJOIN TRAMO_VIAL AS t ON s.id_tramo = t.id_tramo\nORDER BY s.fecha, s.hora;"
+  },
+  {
+    "title": "2. Vehículos involucrados en cada siniestro con aseguradora",
+    "desc": "Útil para cruzar responsabilidades de cobertura por hecho.",
+    "sql": "SELECT\n    vi.id_siniestro,\n    v.patente,\n    v.marca,\n    v.modelo,\n    v.tipo_vehiculo,\n    a.nombre AS aseguradora\nFROM VEHICULO_INVOLUCRADO AS vi\nJOIN VEHICULO AS v ON vi.patente = v.patente\nJOIN ASEGURADORA AS a ON v.id_aseguradora = a.id_aseguradora\nORDER BY vi.id_siniestro, v.patente;"
+  },
+  {
+    "title": "3. Cantidad de siniestros por tipo de camino (GROUP BY)",
+    "desc": "Permite identificar qué tipo de infraestructura concentra más accidentes.",
+    "sql": "SELECT\n    t.tipo_camino,\n    COUNT(*) AS cantidad_siniestros\nFROM SINIESTRO AS s\nJOIN TRAMO_VIAL AS t ON s.id_tramo = t.id_tramo\nGROUP BY t.tipo_camino\nORDER BY cantidad_siniestros DESC, t.tipo_camino;"
+  },
+  {
+    "title": "4. Cantidad de siniestros por tipo de vehículo involucrado",
+    "desc": "Muestra qué categorías de vehículos están más presentes en los hechos registrados.",
+    "sql": "SELECT\n    v.tipo_vehiculo,\n    COUNT(DISTINCT vi.id_siniestro) AS cantidad_siniestros\nFROM VEHICULO_INVOLUCRADO AS vi\nJOIN VEHICULO AS v ON vi.patente = v.patente\nGROUP BY v.tipo_vehiculo\nORDER BY cantidad_siniestros DESC, v.tipo_vehiculo;"
+  },
+  {
+    "title": "5. Cantidad de siniestros por causa probable (GROUP BY + HAVING)",
+    "desc": "Filtra solo las causas que aparecen en más de un informe, para focalizar en las fallas recurrentes del sistema.",
+    "sql": "SELECT\n    it.causa_probable,\n    COUNT(*) AS cantidad\nFROM INFORME_TECNICO AS it\nWHERE it.causa_probable IS NOT NULL\nGROUP BY it.causa_probable\nHAVING COUNT(*) >= 1          -- ajustar umbral según el conjunto real de datos\nORDER BY cantidad DESC, it.causa_probable;"
+  },
+  {
+    "title": "6. Conductores y estado de su licencia al momento del siniestro",
+    "desc": "Para cada conductor se selecciona la licencia vigente más reciente a la fecha del hecho; de no existir ninguna vigente, se toma la más reciente disponible. Esto evita filas duplicadas cuando una persona tiene más de una licencia registrada.",
+    "sql": "WITH licencia_al_hecho AS (\n    SELECT DISTINCT ON (pv.id_siniestro, pv.id_persona)\n        pv.id_siniestro,\n        pv.id_persona,\n        pv.patente,\n        l.nro_licencia,\n        l.estado,\n        l.fecha_vencimiento,\n        CASE\n            WHEN l.estado = 'vigente' AND l.fecha_vencimiento >= s.fecha THEN 'habilitada'\n            ELSE 'no_habilitada'\n        END AS situacion_al_momento_del_hecho\n    FROM participacion_vehicular pv\n    JOIN siniestro s ON pv.id_siniestro = s.id_siniestro\n    LEFT JOIN licencia l ON pv.id_persona = l.id_persona\n    WHERE pv.rol_ocupante = 'conductor'\n    ORDER BY\n        pv.id_siniestro,\n        pv.id_persona,\n        -- priorizar: vigente al momento del hecho primero\n        (l.estado = 'vigente' AND l.fecha_vencimiento >= s.fecha) DESC,\n        l.fecha_vencimiento DESC NULLS LAST\n)\nSELECT\n    lah.id_siniestro,\n    p.nombre,\n    p.apellido,\n    lah.patente,\n    lah.nro_licencia,\n    lah.estado,\n    lah.fecha_vencimiento,\n    lah.situacion_al_momento_del_hecho\nFROM licencia_al_hecho lah\nJOIN persona p ON lah.id_persona = p.id_persona\nORDER BY lah.id_siniestro, p.apellido, p.nombre;"
+  },
+  {
+    "title": "7. Personas involucradas con cantidad de infracciones y",
+    "desc": "antecedentes penales (GROUP BY) Permite cruzar el perfil de riesgo de cada persona.",
+    "sql": "SELECT\n    p.id_persona,\n    p.nombre,\n    p.apellido,\n    COUNT(DISTINCT i.id_infraccion)    AS cantidad_infracciones,\n    COUNT(DISTINCT ap.id_antecedente)  AS cantidad_antecedentes_penales\nFROM PERSONA AS p\nLEFT JOIN infraccion       i  ON p.id_persona = i.id_persona\nLEFT JOIN antecedente_penal ap ON p.id_persona = ap.id_persona\nGROUP BY p.id_persona, p.nombre, p.apellido\nORDER BY cantidad_infracciones DESC, cantidad_antecedentes_penales DESC, p.apellido;"
+  },
+  {
+    "title": "8. Cantidad de testigos por siniestro (GROUP BY)",
+    "desc": "Indica cuántos testigos declararon en cada hecho, lo que puede influir en la calidad probatoria del expediente.",
+    "sql": "SELECT\n    s.id_siniestro,\n    s.fecha,\n    COUNT(t.id_persona) AS cantidad_testigos\nFROM SINIESTRO AS s\nLEFT JOIN testimonio t ON s.id_siniestro = t.id_siniestro\nGROUP BY s.id_siniestro, s.fecha\nORDER BY s.id_siniestro;"
+  },
+  {
+    "title": "9. Siniestros con participantes que no usaban cinturón",
+    "desc": "Permite correlacionar el uso del cinturón con la gravedad de los resultados.",
+    "sql": "SELECT DISTINCT\n    s.id_siniestro,\n    s.fecha,\n    p.nombre,\n    p.apellido,\n    pv.patente,\n    pv.rol_ocupante,\n    pv.condicion_fisica,\n    pv.resultado\nFROM SINIESTRO AS s\nJOIN participacion_vehicular pv ON s.id_siniestro = pv.id_siniestro\nJOIN PERSONA AS p  ON pv.id_persona   = p.id_persona\nWHERE pv.usa_cinturon = FALSE\nORDER BY s.id_siniestro, p.apellido;"
+  },
+  {
+    "title": "10. Siniestros con y sin seguridad peatonal (GROUP BY)",
+    "desc": "Muestra la distribución de la variable seguridad_peatonal en los informes técnicos.",
+    "sql": "SELECT\n    it.seguridad_peatonal,\n    COUNT(*) AS cantidad_siniestros\nFROM INFORME_TECNI it\nGROUP BY it.seguridad_peatonal\nORDER BY it.seguridad_peatonal;"
+  },
+  {
+    "title": "11. Siniestros donde participó al menos un conductor",
+    "desc": "con licencia no habilitada al momento del hecho Versión corregida: se usa una subconsulta para determinar primero cuál es la licencia aplicable a la fecha del hecho, evitando falsos positivos por múltiples licencias históricas.",
+    "sql": "WITH conductor_sin_habilitacion AS (\n    SELECT DISTINCT ON (pv.id_siniestro, pv.id_persona)\n        pv.id_siniestro,\n        pv.id_persona,\n        s.fecha             AS fecha_siniestro,\n        l.estado,\n        l.fecha_vencimiento,\n        CASE\n            WHEN l.id_licencia IS NULL THEN 'sin_licencia'\n            WHEN l.estado <> 'vigente'          THEN 'licencia_' || l.estado\n            WHEN l.fecha_vencimiento < s.fecha  THEN 'vencida_al_momento'\n            ELSE 'habilitada'\n        END AS situacion\n    FROM participacion_vehicular pv\n    JOIN siniestro s ON pv.id_siniestro = s.id_siniestro\n    LEFT JOIN licencia l ON pv.id_persona = l.id_persona\n    WHERE pv.rol_ocupante = 'conductor'\n    ORDER BY\n        pv.id_siniestro,\n        pv.id_persona,\n        (l.estado = 'vigente' AND l.fecha_vencimiento >= s.fecha) DESC,\n        l.fecha_vencimiento DESC NULLS LAST\n)\nSELECT\n    csh.id_siniestro,\n    csh.fecha_siniestro,\n    p.nombre,\n    p.apellido,\n    csh.situacion,\n    csh.estado,\n    csh.fecha_vencimiento\nFROM conductor_sin_habilitacion csh\nJOIN persona p ON csh.id_persona = p.id_persona\nWHERE csh.situacion <> 'habilitada'\nORDER BY csh.id_siniestro;"
+  },
+  {
+    "title": "12. Cantidad de participaciones por persona en siniestros",
+    "desc": "vehiculares, filtrando solo personas con más de una participación (GROUP BY + HAVING) Identifica personas reincidentes en hechos viales.",
+    "sql": "SELECT\n    p.id_persona,\n    p.nombre,\n    p.apellido,\n    COUNT(*) AS cantidad_participaciones\nFROM PARTICIPACION_VEHICULAR AS pv\nJOIN PERSONA AS p ON pv.id_persona = p.id_persona\nGROUP BY p.id_persona, p.nombre, p.apellido\nHAVING COUNT(*) > 1\nORDER BY cantidad_participaciones DESC, p.apellido, p.nombre;"
+  }
+];
+
+function initQueries() {
+  var sb = document.getElementById("queries-sidebar");
+  var html = "<div class=\"sql-section\">Consultas de análisis</div>";
+  for (var i = 0; i < QUERIES.length; i++) {
+    html += "<div class=\"sql-item\" id=\"qitem-" + i + "\" onclick=\"showQuery(" + i + ")\">" + QUERIES[i].title + "</div>";
+  }
+  sb.innerHTML = html;
+  showQuery(0);
+}
+
+function showQuery(idx) {
+  currentQueryIdx = idx;
+  var items = document.querySelectorAll("#queries-sidebar .sql-item");
+  for (var j = 0; j < items.length; j++) items[j].classList.remove("active");
+  var item = document.getElementById("qitem-" + idx);
+  if (item) item.classList.add("active");
+  document.getElementById("query-desc").textContent = QUERIES[idx].desc;
+  document.getElementById("query-code").innerHTML = syntaxHighlight(QUERIES[idx].sql);
+}
+
+var currentQueryIdx = 0;
+
+function copyQuery() {
+  var q = QUERIES[currentQueryIdx];
+  if (!q) return;
+  navigator.clipboard.writeText(q.sql).then(function() {
+    var btn = document.getElementById('btn-copy');
+    btn.textContent = '✓ Copiado';
+    btn.style.background = 'rgba(52,211,153,.2)';
+    btn.style.borderColor = 'rgba(52,211,153,.4)';
+    btn.style.color = 'var(--green)';
+    setTimeout(function() {
+      btn.textContent = '📋 Copiar';
+      btn.style.background = 'rgba(79,142,247,.15)';
+      btn.style.borderColor = 'rgba(79,142,247,.3)';
+      btn.style.color = 'var(--accent)';
+    }, 2000);
+  });
+}
+
+initQueries();
+</script>
+
+</body>
+</html>
