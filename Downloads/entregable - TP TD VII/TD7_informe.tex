@@ -1,0 +1,213 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[spanish]{babel}
+\usepackage[a4paper,margin=2.5cm]{geometry}
+\usepackage{enumitem}
+\usepackage{hyperref}
+
+\title{Trabajo Práctico Grupal -- Primera Entrega\\Sistema Nacional de Registro de Accidentes Viales}
+\author{Franco Odiz, Juan Pablo Saldungaray y Uriel Slavkin}
+\date{17/05/2026}
+
+\begin{document}
+
+\maketitle
+
+\section{Introducción}
+
+El presente trabajo desarrolla el diseño de una base de datos para un Registro Único de Accidentes de Tránsito (RUAT). El objetivo es modelar la información necesaria para registrar siniestros viales, personas involucradas, vehículos, antecedentes, peritajes y características del entorno, de modo de permitir tanto el almacenamiento operativo como la posterior explotación analítica de los datos.
+
+La propuesta se apoya en un modelado conceptual del dominio y en su posterior transformación al modelo relacional, con especial atención a la eliminación de redundancia, la explicitación de restricciones y la posibilidad de realizar consultas de interés para la toma de decisiones.
+
+\section{Análisis del dominio y requerimientos}
+
+A partir del enunciado del problema, se identifican los siguientes requerimientos funcionales y de información:
+
+\begin{itemize}[leftmargin=*]
+    \item Registrar cada siniestro con su fecha, hora, lugar, denuncia policial, tipo de accidente y tipo de colisión.
+    \item Asociar cada siniestro a un tramo o lugar vial relevante para luego poder analizar accidentes por tipo de camino.
+    \item Registrar personas involucradas en los hechos, incluyendo conductores, acompañantes, testigos y víctimas no vehiculares.
+    \item Registrar vehículos involucrados, junto con información del parque automotor, categoría, antigüedad, aseguradora y cobertura.
+    \item Registrar informes técnicos, estudios y peritajes vinculados con cada siniestro.
+    \item Registrar condiciones contextuales del hecho: estado de la vía, pavimento, iluminación, clima y elementos de seguridad peatonal.
+    \item Registrar antecedentes asociados a las personas: licencias de conducir, infracciones y antecedentes penales.
+    \item Permitir consultas que sirvan para describir y analizar el fenómeno, por ejemplo:
+    \begin{itemize}
+        \item cantidad de accidentes por tipo de camino;
+        \item cantidad de accidentes por tipo de vehículo;
+        \item accidentes asociados a ciertas fallas humanas;
+        \item presencia de antecedentes o licencias vencidas en personas involucradas.
+    \end{itemize}
+\end{itemize}
+
+Además de los requerimientos explícitos, se decidió incorporar algunas precisiones de modelado para mejorar la consistencia:
+
+\begin{itemize}[leftmargin=*]
+    \item Separar \texttt{PERSONA} y \texttt{VEHICULO}, ya que son entidades independientes y pueden intervenir varias veces en distintos siniestros.
+    \item Representar la participación de una persona en un vehículo dentro de un siniestro mediante una relación específica, porque el vínculo real es ternario.
+    \item Separar los informes técnicos del siniestro, dado que un mismo hecho puede originar uno o varios estudios.
+    \item Modelar la infraestructura vial mediante una entidad propia, para soportar estadísticas del sistema de tránsito general.
+\end{itemize}
+
+\section{Modelo conceptual (descripción textual)}
+
+Por decisión de presentación, el modelo conceptual se describe en forma textual en este informe.
+
+\subsection*{Entidades}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{SINIESTRO}(\underline{id\_siniestro}, fecha, hora, referencia\_lugar, nro\_denuncia\_policial, tipo\_accidente, tipo\_colision)
+    \item \textbf{TRAMO\_VIAL}(\underline{id\_tramo}, descripcion, tipo\_camino, jurisdiccion, longitud\_km)
+    \item \textbf{PERSONA}(\underline{id\_persona}, tipo\_doc, nro\_doc, nombre, apellido, fecha\_nacimiento, domicilio, telefono)
+    \item \textbf{LICENCIA}(\underline{id\_licencia}, nro\_licencia, clase, fecha\_emision, fecha\_vencimiento, estado)
+    \item \textbf{INFRACCION}(\underline{id\_infraccion}, fecha, tipo\_infraccion, descripcion, jurisdiccion, monto, estado)
+    \item \textbf{ANTECEDENTE\_PENAL}(\underline{id\_antecedente}, fecha, caratula, organismo, observaciones)
+    \item \textbf{VEHICULO}(\underline{patente}, vin, marca, modelo, anio\_modelo, tipo\_vehiculo, categoria, tipo\_cobertura)
+    \item \textbf{ASEGURADORA}(\underline{id\_aseguradora}, nombre, telefono, domicilio)
+    \item \textbf{INFORME\_TECNICO}(\underline{id\_informe}, fecha\_informe, organismo\_emisor, funcionario\_responsable, hipotesis\_hecho, causa\_probable, falla\_humana\_probable, tipo\_pavimento, estado\_via, iluminacion, condicion\_climatica, seguridad\_peatonal)
+\end{itemize}
+
+\subsection*{Relaciones}
+
+\begin{itemize}[leftmargin=*]
+    \item \textbf{OCURRE\_EN} entre \texttt{SINIESTRO} y \texttt{TRAMO\_VIAL}: un tramo vial puede estar asociado a muchos siniestros; cada siniestro se registra en un único tramo vial principal: relación 1:N.   
+    \item \textbf{GENERA} entre \texttt{SINIESTRO} e \texttt{INFORME\_TECNICO}: un siniestro puede generar cero, uno o varios informes; cada informe corresponde a un único siniestro: relación 1:N.
+    \item \textbf{VEHICULO\_INVOLUCRADO} entre \texttt{SINIESTRO} y \texttt{VEHICULO}: relación N:M.
+    \item \textbf{PARTICIPACION\_VEHICULAR} entre \texttt{SINIESTRO}, \texttt{PERSONA} y \texttt{VEHICULO}: representa a una persona asociada a un vehículo en un siniestro determinado.
+    \item \textbf{TESTIMONIO} entre \texttt{SINIESTRO} y \texttt{PERSONA}: relación N:M.
+    \item \textbf{VICTIMA\_NO\_VEHICULAR} entre \texttt{SINIESTRO} y \texttt{PERSONA}: relación N:M.
+    \item \textbf{POSEE} entre \texttt{PERSONA} y \texttt{LICENCIA}: relación 1:N.
+    \item \textbf{REGISTRA} entre \texttt{PERSONA} e \texttt{INFRACCION}: relación 1:N.
+    \item \textbf{POSEE\_ANTECEDENTE} entre \texttt{PERSONA} y \texttt{ANTECEDENTE\_PENAL}: relación 1:N.
+    \item \textbf{HABILITACION\_CONDUCCION} entre \texttt{PERSONA} y \texttt{VEHICULO}: relación N:M.
+    \item \textbf{ASEGURADO\_POR} entre \texttt{VEHICULO} y \texttt{ASEGURADORA}: relación N:1.
+\end{itemize}
+
+\section{Modelo lógico: esquema relacional}
+
+A partir del modelo conceptual se obtiene el siguiente esquema relacional:
+
+\begin{enumerate}[leftmargin=*]
+    \item \texttt{TRAMO\_VIAL(id\_tramo, descripcion, tipo\_camino, jurisdiccion, longitud\_km)}\\
+    PK: \texttt{id\_tramo}
+
+    \item \texttt{SINIESTRO(id\_siniestro, fecha, hora, id\_tramo, referencia\_lugar, nro\_denuncia\_policial, tipo\_accidente, tipo\_colision)}\\
+    PK: \texttt{id\_siniestro}\\
+    FK: \texttt{id\_tramo} $\rightarrow$ \texttt{TRAMO\_VIAL(id\_tramo)}
+
+    \item \texttt{INFORME\_TECNICO(id\_informe, id\_siniestro, fecha\_informe, organismo\_emisor, funcionario\_responsable, hipotesis\_hecho, causa\_probable, falla\_humana\_probable, tipo\_pavimento, estado\_via, iluminacion, condicion\_climatica, seguridad\_peatonal)}\\
+    PK: \texttt{id\_informe}\\
+    FK: \texttt{id\_siniestro} $\rightarrow$ \texttt{SINIESTRO(id\_siniestro)}
+
+    \item \texttt{PERSONA(id\_persona, tipo\_doc, nro\_doc, nombre, apellido, fecha\_nacimiento, domicilio, telefono)}\\
+    PK: \texttt{id\_persona}
+
+    \item \texttt{LICENCIA(id\_licencia, id\_persona, nro\_licencia, clase, fecha\_emision, fecha\_vencimiento, estado)}\\
+    PK: \texttt{id\_licencia}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}
+
+    \item \texttt{INFRACCION(id\_infraccion, id\_persona, fecha, tipo\_infraccion, descripcion, jurisdiccion, monto, estado)}\\
+    PK: \texttt{id\_infraccion}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}
+
+    \item \texttt{ANTECEDENTE\_PENAL(id\_antecedente, id\_persona, fecha, caratula, organismo, observaciones)}\\
+    PK: \texttt{id\_antecedente}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}
+
+    \item \texttt{ASEGURADORA(id\_aseguradora, nombre, telefono, domicilio)}\\
+    PK: \texttt{id\_aseguradora}
+
+    \item \texttt{VEHICULO(patente, vin, marca, modelo, anio\_modelo, tipo\_vehiculo, categoria, tipo\_cobertura, id\_aseguradora)}\\
+    PK: \texttt{patente}\\
+    FK: \texttt{id\_aseguradora} $\rightarrow$ \texttt{ASEGURADORA(id\_aseguradora)}
+
+    \item \texttt{HABILITACION\_CONDUCCION(id\_persona, patente, fecha\_desde, fecha\_hasta)}\\
+    PK: \texttt{(id\_persona, patente, fecha\_desde)}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}\\
+    FK: \texttt{patente} $\rightarrow$ \texttt{VEHICULO(patente)}
+
+    \item \texttt{VEHICULO\_INVOLUCRADO(id\_siniestro, patente, danio\_material, observaciones)}\\
+    PK: \texttt{(id\_siniestro, patente)}\\
+    FK: \texttt{id\_siniestro} $\rightarrow$ \texttt{SINIESTRO(id\_siniestro)}\\
+    FK: \texttt{patente} $\rightarrow$ \texttt{VEHICULO(patente)}
+
+    \item \texttt{PARTICIPACION\_VEHICULAR(id\_siniestro, id\_persona, patente, rol\_ocupante, usa\_cinturon, condicion\_fisica, resultado)}\\
+    PK: \texttt{(id\_siniestro, id\_persona, patente)}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}\\
+    FK: \texttt{(id\_siniestro, patente)} $\rightarrow$ \texttt{VEHICULO\_INVOLUCRADO(id\_siniestro, patente)}
+
+    \item \texttt{TESTIMONIO(id\_siniestro, id\_persona, declaracion, medio\_contacto)}\\
+    PK: \texttt{(id\_siniestro, id\_persona)}\\
+    FK: \texttt{id\_siniestro} $\rightarrow$ \texttt{SINIESTRO(id\_siniestro)}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}
+
+    \item \texttt{VICTIMA\_NO\_VEHICULAR(id\_siniestro, id\_persona, tipo\_victima, condicion\_fisica, observaciones)}\\
+    PK: \texttt{(id\_siniestro, id\_persona)}\\
+    FK: \texttt{id\_siniestro} $\rightarrow$ \texttt{SINIESTRO(id\_siniestro)}\\
+    FK: \texttt{id\_persona} $\rightarrow$ \texttt{PERSONA(id\_persona)}
+\end{enumerate}
+
+\section{Sustento lógico y normalización}
+
+Se buscó un diseño que reduzca redundancias y anomalías de actualización:
+
+\begin{itemize}[leftmargin=*]
+    \item Los datos del siniestro se almacenan una sola vez en \texttt{SINIESTRO}.
+    \item Los datos permanentes de personas y vehículos se separan de sus participaciones en hechos concretos.
+    \item Los antecedentes de las personas se modelan en tablas específicas, evitando repetirlos en cada siniestro.
+    \item Las relaciones N:M se descomponen en tablas asociativas.
+    \item La participación persona--vehículo--siniestro se modela explícitamente, porque no puede representarse correctamente con una sola relación binaria.
+\end{itemize}
+
+Bajo los supuestos adoptados, las relaciones propuestas cumplen BCNF, ya que en cada tabla los atributos no clave dependen funcionalmente de una clave candidata completa, y no se introducen dependencias funcionales no triviales cuyo determinante no sea superclave.
+
+\section{Supuestos asumidos}
+
+\begin{enumerate}[leftmargin=*]
+    \item Cada siniestro se identifica mediante un \texttt{id\_siniestro} único.
+    \item Cada persona se identifica mediante un \texttt{id\_persona} único.
+    \item Cada vehículo se identifica por su \texttt{patente}; el \texttt{vin} se considera único cuando está disponible.
+    \item Cada siniestro se asocia a un único tramo vial principal.
+    \item Un vehículo puede figurar como involucrado en un siniestro aunque aún no se haya identificado a su conductor.
+    \item Una persona puede aparecer en distintos roles según el hecho: conductor, acompañante, testigo o víctima no vehicular.
+    \item Los antecedentes de licencia, infracciones y antecedentes penales pertenecen a la persona y no al siniestro.
+    \item Un vehículo se registra con una única aseguradora vigente y un único tipo de cobertura vigente.
+    \item Los valores como \texttt{tipo\_accidente}, \texttt{tipo\_colision}, \texttt{estado\_via} o \texttt{condicion\_climatica} se modelan como atributos atómicos.
+\end{enumerate}
+
+\section{Restricciones en lenguaje natural}
+
+Las siguientes restricciones no quedan completamente expresadas solo con claves y claves foráneas:
+
+\begin{enumerate}[leftmargin=*]
+    \item Para un mismo siniestro y un mismo vehículo, puede existir como máximo una persona con rol de conductor.
+    \item Toda participación vehicular debe referirse a un vehículo previamente registrado como involucrado en ese siniestro.
+    \item Una misma persona no debería registrarse simultáneamente como testigo y como participante vehicular del mismo siniestro, salvo excepción fundada.
+    \item Para considerar una licencia válida al momento del hecho, la fecha del siniestro debe estar comprendida entre la fecha de emisión y la fecha de vencimiento, y además la licencia debe tener estado vigente.
+    \item La longitud de un tramo vial debe ser mayor que cero.
+    \item El atributo \texttt{usa\_cinturon} solo tiene sentido para personas que viajaban en vehículos donde dicho elemento de seguridad exista.
+    \item La existencia de una habilitación de conducción entre una persona y un vehículo no implica necesariamente que haya sido quien lo conducía en el siniestro.
+\end{enumerate}
+
+\section{Implementación y consultas}
+
+Junto con este informe se entregan:
+
+\begin{itemize}[leftmargin=*]
+    \item un script SQL llamado \texttt{01\_schema.sql} para crear las tablas y restricciones.
+    \item un archivo llamado \texttt{der\_interactivo.html} para visualizar el modelo entidad-interrelación de manera interactiva desde el navegador.
+    \item un script SQL llamado \texttt{02\_data.sql} para cargar datos de ejemplo.
+    \item un script SQL llamado \texttt{03\_consultas.sql} con consultas de interés sobre la base.
+    \item un archivo llamado \texttt{schema\_visual.html} para visualizar las tablas, relaciones con atributos y consultas en sql desde el navegador.
+    \item el enlace a una Calculadora de álgebra relacional (RelaX) \url{https://dbis-uibk.github.io/relax/calc/gist/d6aebeb1ee9585541a512ccc597d560e} con datos cargados donde poder experimentar y realizar consultas de sql online sin necesidad de descargar ni instalar nada.
+\end{itemize}
+
+Las consultas incluidas permiten describir el dominio y cumplen con el requerimiento de incorporar operaciones de junta (\texttt{JOIN}) y agrupamiento (\texttt{GROUP BY}).
+
+\section{Conclusión}
+
+La propuesta organiza el dominio alrededor del siniestro como hecho central y lo vincula con infraestructura vial, personas, vehículos, antecedentes y peritajes. El diseño permite registrar los datos relevantes del problema y, al mismo tiempo, habilita consultas útiles para el análisis de seguridad vial y el soporte a políticas públicas.
+
+\end{document}
