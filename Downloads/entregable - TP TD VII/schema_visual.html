@@ -916,52 +916,52 @@ var QUERIES = [
   {
     "title": "1. Listado general de siniestros con su tramo vial",
     "desc": "Permite obtener un resumen cronológico de todos los hechos registrados junto con la descripción de la vía donde ocurrieron.",
-    "sql": "SELECT\n    s.id_siniestro,\n    s.fecha,\n    s.hora,\n    s.tipo_accidente,\n    s.tipo_colision,\n    t.descripcion   AS tramo,\n    t.tipo_camino,\n    t.jurisdiccion\nFROM siniestro s\nJOIN tramo_vial t ON s.id_tramo = t.id_tramo\nORDER BY s.fecha, s.hora;"
+    "sql": "SELECT\n    s.id_siniestro,\n    s.fecha,\n    s.hora,\n    s.tipo_accidente,\n    s.tipo_colision,\n    t.descripcion   AS tramo,\n    t.tipo_camino,\n    t.jurisdiccion\nFROM SINIESTRO AS s\nJOIN TRAMO_VIAL AS t ON s.id_tramo = t.id_tramo\nORDER BY s.fecha, s.hora;"
   },
   {
     "title": "2. Vehículos involucrados en cada siniestro con aseguradora",
     "desc": "Útil para cruzar responsabilidades de cobertura por hecho.",
-    "sql": "SELECT\n    vi.id_siniestro,\n    v.patente,\n    v.marca,\n    v.modelo,\n    v.tipo_vehiculo,\n    a.nombre AS aseguradora\nFROM vehiculo_involucrado vi\nJOIN vehiculo    v ON vi.patente        = v.patente\nJOIN aseguradora a ON v.id_aseguradora = a.id_aseguradora\nORDER BY vi.id_siniestro, v.patente;"
+    "sql": "SELECT\n    vi.id_siniestro,\n    v.patente,\n    v.marca,\n    v.modelo,\n    v.tipo_vehiculo,\n    a.nombre AS aseguradora\nFROM VEHICULO_INVOLUCRADO AS vi\nJOIN VEHICULO AS v ON vi.patente = v.patente\nJOIN ASEGURADORA AS a ON v.id_aseguradora = a.id_aseguradora\nORDER BY vi.id_siniestro, v.patente;"
   },
   {
     "title": "3. Cantidad de siniestros por tipo de camino (GROUP BY)",
     "desc": "Permite identificar qué tipo de infraestructura concentra más accidentes.",
-    "sql": "SELECT\n    t.tipo_camino,\n    COUNT(*) AS cantidad_siniestros\nFROM siniestro  s\nJOIN tramo_vial t ON s.id_tramo = t.id_tramo\nGROUP BY t.tipo_camino\nORDER BY cantidad_siniestros DESC, t.tipo_camino;"
+    "sql": "SELECT\n    t.tipo_camino,\n    COUNT(*) AS cantidad_siniestros\nFROM SINIESTRO AS s\nJOIN TRAMO_VIAL AS t ON s.id_tramo = t.id_tramo\nGROUP BY t.tipo_camino\nORDER BY cantidad_siniestros DESC, t.tipo_camino;"
   },
   {
     "title": "4. Cantidad de siniestros por tipo de vehículo involucrado",
     "desc": "Muestra qué categorías de vehículos están más presentes en los hechos registrados.",
-    "sql": "SELECT\n    v.tipo_vehiculo,\n    COUNT(DISTINCT vi.id_siniestro) AS cantidad_siniestros\nFROM vehiculo_involucrado vi\nJOIN vehiculo v ON vi.patente = v.patente\nGROUP BY v.tipo_vehiculo\nORDER BY cantidad_siniestros DESC, v.tipo_vehiculo;"
+    "sql": "SELECT\n    v.tipo_vehiculo,\n    COUNT(DISTINCT vi.id_siniestro) AS cantidad_siniestros\nFROM VEHICULO_INVOLUCRADO AS vi\nJOIN VEHICULO AS v ON vi.patente = v.patente\nGROUP BY v.tipo_vehiculo\nORDER BY cantidad_siniestros DESC, v.tipo_vehiculo;"
   },
   {
     "title": "5. Cantidad de siniestros por causa probable (GROUP BY + HAVING)",
     "desc": "Filtra solo las causas que aparecen en más de un informe, para focalizar en las fallas recurrentes del sistema.",
-    "sql": "SELECT\n    it.causa_probable,\n    COUNT(*) AS cantidad\nFROM informe_tecnico it\nWHERE it.causa_probable IS NOT NULL\nGROUP BY it.causa_probable\nHAVING COUNT(*) >= 1          -- ajustar umbral según el conjunto real de datos\nORDER BY cantidad DESC, it.causa_probable;"
+    "sql": "SELECT\n    it.causa_probable,\n    COUNT(*) AS cantidad\nFROM INFORME_TECNICO AS it\nWHERE it.causa_probable IS NOT NULL\nGROUP BY it.causa_probable\nHAVING COUNT(*) >= 1          -- ajustar umbral según el conjunto real de datos\nORDER BY cantidad DESC, it.causa_probable;"
   },
   {
     "title": "6. Conductores y estado de su licencia al momento del siniestro",
-    "desc": "Versión corregida: para cada conductor se selecciona la licencia vigente más reciente a la fecha del hecho; de no existir ninguna vigente, se toma la más reciente disponible. Esto evita filas duplicadas cuando una persona tiene más de una licencia registrada.",
+    "desc": "Para cada conductor se selecciona la licencia vigente más reciente a la fecha del hecho; de no existir ninguna vigente, se toma la más reciente disponible. Esto evita filas duplicadas cuando una persona tiene más de una licencia registrada.",
     "sql": "WITH licencia_al_hecho AS (\n    SELECT DISTINCT ON (pv.id_siniestro, pv.id_persona)\n        pv.id_siniestro,\n        pv.id_persona,\n        pv.patente,\n        l.nro_licencia,\n        l.estado,\n        l.fecha_vencimiento,\n        CASE\n            WHEN l.estado = 'vigente' AND l.fecha_vencimiento >= s.fecha THEN 'habilitada'\n            ELSE 'no_habilitada'\n        END AS situacion_al_momento_del_hecho\n    FROM participacion_vehicular pv\n    JOIN siniestro s ON pv.id_siniestro = s.id_siniestro\n    LEFT JOIN licencia l ON pv.id_persona = l.id_persona\n    WHERE pv.rol_ocupante = 'conductor'\n    ORDER BY\n        pv.id_siniestro,\n        pv.id_persona,\n        -- priorizar: vigente al momento del hecho primero\n        (l.estado = 'vigente' AND l.fecha_vencimiento >= s.fecha) DESC,\n        l.fecha_vencimiento DESC NULLS LAST\n)\nSELECT\n    lah.id_siniestro,\n    p.nombre,\n    p.apellido,\n    lah.patente,\n    lah.nro_licencia,\n    lah.estado,\n    lah.fecha_vencimiento,\n    lah.situacion_al_momento_del_hecho\nFROM licencia_al_hecho lah\nJOIN persona p ON lah.id_persona = p.id_persona\nORDER BY lah.id_siniestro, p.apellido, p.nombre;"
   },
   {
     "title": "7. Personas involucradas con cantidad de infracciones y",
     "desc": "antecedentes penales (GROUP BY) Permite cruzar el perfil de riesgo de cada persona.",
-    "sql": "SELECT\n    p.id_persona,\n    p.nombre,\n    p.apellido,\n    COUNT(DISTINCT i.id_infraccion)    AS cantidad_infracciones,\n    COUNT(DISTINCT ap.id_antecedente)  AS cantidad_antecedentes_penales\nFROM persona p\nLEFT JOIN infraccion       i  ON p.id_persona = i.id_persona\nLEFT JOIN antecedente_penal ap ON p.id_persona = ap.id_persona\nGROUP BY p.id_persona, p.nombre, p.apellido\nORDER BY cantidad_infracciones DESC, cantidad_antecedentes_penales DESC, p.apellido;"
+    "sql": "SELECT\n    p.id_persona,\n    p.nombre,\n    p.apellido,\n    COUNT(DISTINCT i.id_infraccion)    AS cantidad_infracciones,\n    COUNT(DISTINCT ap.id_antecedente)  AS cantidad_antecedentes_penales\nFROM PERSONA AS p\nLEFT JOIN infraccion       i  ON p.id_persona = i.id_persona\nLEFT JOIN antecedente_penal ap ON p.id_persona = ap.id_persona\nGROUP BY p.id_persona, p.nombre, p.apellido\nORDER BY cantidad_infracciones DESC, cantidad_antecedentes_penales DESC, p.apellido;"
   },
   {
     "title": "8. Cantidad de testigos por siniestro (GROUP BY)",
     "desc": "Indica cuántos testigos declararon en cada hecho, lo que puede influir en la calidad probatoria del expediente.",
-    "sql": "SELECT\n    s.id_siniestro,\n    s.fecha,\n    COUNT(t.id_persona) AS cantidad_testigos\nFROM siniestro  s\nLEFT JOIN testimonio t ON s.id_siniestro = t.id_siniestro\nGROUP BY s.id_siniestro, s.fecha\nORDER BY s.id_siniestro;"
+    "sql": "SELECT\n    s.id_siniestro,\n    s.fecha,\n    COUNT(t.id_persona) AS cantidad_testigos\nFROM SINIESTRO AS s\nLEFT JOIN testimonio t ON s.id_siniestro = t.id_siniestro\nGROUP BY s.id_siniestro, s.fecha\nORDER BY s.id_siniestro;"
   },
   {
     "title": "9. Siniestros con participantes que no usaban cinturón",
     "desc": "Permite correlacionar el uso del cinturón con la gravedad de los resultados.",
-    "sql": "SELECT DISTINCT\n    s.id_siniestro,\n    s.fecha,\n    p.nombre,\n    p.apellido,\n    pv.patente,\n    pv.rol_ocupante,\n    pv.condicion_fisica,\n    pv.resultado\nFROM siniestro             s\nJOIN participacion_vehicular pv ON s.id_siniestro = pv.id_siniestro\nJOIN persona               p  ON pv.id_persona   = p.id_persona\nWHERE pv.usa_cinturon = FALSE\nORDER BY s.id_siniestro, p.apellido;"
+    "sql": "SELECT DISTINCT\n    s.id_siniestro,\n    s.fecha,\n    p.nombre,\n    p.apellido,\n    pv.patente,\n    pv.rol_ocupante,\n    pv.condicion_fisica,\n    pv.resultado\nFROM SINIESTRO AS s\nJOIN participacion_vehicular pv ON s.id_siniestro = pv.id_siniestro\nJOIN PERSONA AS p  ON pv.id_persona   = p.id_persona\nWHERE pv.usa_cinturon = FALSE\nORDER BY s.id_siniestro, p.apellido;"
   },
   {
     "title": "10. Siniestros con y sin seguridad peatonal (GROUP BY)",
     "desc": "Muestra la distribución de la variable seguridad_peatonal en los informes técnicos.",
-    "sql": "SELECT\n    it.seguridad_peatonal,\n    COUNT(*) AS cantidad_siniestros\nFROM informe_tecnico it\nGROUP BY it.seguridad_peatonal\nORDER BY it.seguridad_peatonal;"
+    "sql": "SELECT\n    it.seguridad_peatonal,\n    COUNT(*) AS cantidad_siniestros\nFROM INFORME_TECNI it\nGROUP BY it.seguridad_peatonal\nORDER BY it.seguridad_peatonal;"
   },
   {
     "title": "11. Siniestros donde participó al menos un conductor",
@@ -971,7 +971,7 @@ var QUERIES = [
   {
     "title": "12. Cantidad de participaciones por persona en siniestros",
     "desc": "vehiculares, filtrando solo personas con más de una participación (GROUP BY + HAVING) Identifica personas reincidentes en hechos viales.",
-    "sql": "SELECT\n    p.id_persona,\n    p.nombre,\n    p.apellido,\n    COUNT(*) AS cantidad_participaciones\nFROM participacion_vehicular pv\nJOIN persona p ON pv.id_persona = p.id_persona\nGROUP BY p.id_persona, p.nombre, p.apellido\nHAVING COUNT(*) > 1\nORDER BY cantidad_participaciones DESC, p.apellido, p.nombre;"
+    "sql": "SELECT\n    p.id_persona,\n    p.nombre,\n    p.apellido,\n    COUNT(*) AS cantidad_participaciones\nFROM PARTICIPACION_VEHICULAR AS pv\nJOIN PERSONA AS p ON pv.id_persona = p.id_persona\nGROUP BY p.id_persona, p.nombre, p.apellido\nHAVING COUNT(*) > 1\nORDER BY cantidad_participaciones DESC, p.apellido, p.nombre;"
   }
 ];
 
