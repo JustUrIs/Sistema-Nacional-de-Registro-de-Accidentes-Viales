@@ -1,0 +1,157 @@
+group: RUAT
+
+TRAMO_VIAL = {
+  id_tramo:number, descripcion:string, tipo_camino:string, jurisdiccion:string, longitud_km:number
+  1, 'Autopista Buenos Aires La Plata', 'autopista', 'Buenos Aires', 50
+  2, 'Avenida Rivadavia', 'avenida', 'CABA', 18
+  3, 'Ruta Nacional 9 Tramo Rosario', 'ruta', 'Santa Fe', 120
+  4, 'Calle 50 entre 7 y 8', 'calle', 'La Plata', 2
+}
+
+PERSONA = {
+  id_persona:number, tipo_doc:string, nro_doc:string, nombre:string, apellido:string, fecha_nacimiento:date, domicilio:string, telefono:string
+  1, 'DNI', '30111222', 'Juan', 'Perez', 1988-04-12, 'Calle 10 123 La Plata', '2214001001'
+  2, 'DNI', '28999111', 'Ana', 'Gomez', 1985-08-22, 'Av 44 456 La Plata', '2214001002'
+  3, 'DNI', '33444555', 'Luis', 'Diaz', 1990-01-10, 'San Martin 222 Rosario', '3415001003'
+  4, 'DNI', '27777888', 'Marta', 'Lopez', 1979-06-03, 'Belgrano 100 Rosario', '3415001004'
+  5, 'DNI', '35555666', 'Carla', 'Ruiz', 1995-09-14, 'Calle 60 789 Quilmes', '1145001005'
+  6, 'DNI', '36666777', 'Diego', 'Fernandez', 1987-12-19, 'Av Mitre 1200 Avellaneda', '1145001006'
+  7, 'DNI', '37777889', 'Sofia', 'Alvarez', 1992-07-01, 'Rivadavia 3500 CABA', '1145001007'
+  8, 'DNI', '38888990', 'Pedro', 'Molina', 2001-11-11, 'Moreno 777 CABA', '1145001008'
+  9, 'DNI', '39999001', 'Valeria', 'Castro', 1993-03-30, 'Diag 74 250 La Plata', '2214001009'
+}
+
+ASEGURADORA = {
+  id_aseguradora:number, nombre:string, telefono:string, domicilio:string
+  1, 'Seguros del Plata', '0800-111-1111', 'CABA 100'
+  2, 'Proteccion Federal', '0800-222-2222', 'Rosario 200'
+}
+
+VEHICULO = {
+  patente:string, vin:string, marca:string, modelo:string, anio_modelo:number, tipo_vehiculo:string, categoria:string, tipo_cobertura:string, id_aseguradora:number
+  'AA111AA', 'VIN-AA111AA', 'Toyota', 'Corolla', 2018, 'auto', 'gama_media', 'amplia', 1
+  'AB222BB', 'VIN-AB222BB', 'Ford', 'Ranger', 2020, 'camioneta', 'utilitario', 'terceros', 2
+  'AC333CC', 'VIN-AC333CC', 'Honda', 'CG150', 2022, 'moto', 'utilitario', 'responsabilidad_civil', 1
+  'AD444DD', 'VIN-AD444DD', 'Iveco', 'Tector', 2016, 'camion', 'carga', 'terceros', 2
+}
+
+SINIESTRO = {
+  id_siniestro:number, fecha:date, hora:string, id_tramo:number, referencia_lugar:string, nro_denuncia_policial:string, tipo_accidente:string, tipo_colision:string
+  101, 2025-03-10, '08:30', 1, 'Km 15 mano a CABA', 'DP-1001', 'colision_multiple', 'vehiculo'
+  102, 2025-03-15, '14:15', 2, 'Altura 5200', 'DP-1002', 'atropello', 'peaton'
+  103, 2025-04-01, '22:00', 3, 'Km 278', 'DP-1003', 'despiste', 'edificio'
+  104, 2025-04-20, '11:45', 4, 'Entre calles 7 y 8', 'DP-1004', 'colision_lateral', 'vehiculo'
+}
+
+INFORME_TECNICO = {
+  id_informe:number, id_siniestro:number, fecha_informe:date, organismo_emisor:string, funcionario_responsable:string, hipotesis_hecho:string, causa_probable:string, falla_humana_probable:string, tipo_pavimento:string, estado_via:string, iluminacion:string, condicion_climatica:string, seguridad_peatonal:boolean
+  1001, 101, 2025-03-12, 'Agencia Vial Provincial', 'Ing. Garcia', 'Conductor no respeto distancia minima', 'distancia_insuficiente', 'distraccion', 'asfalto', 'seca', 'diurna', 'despejado', true
+  1002, 102, 2025-03-17, 'Pericia Urbana CABA', 'Dr. Martinez', 'Moto circulaba por encima del limite', 'exceso_velocidad', 'imprudencia', 'asfalto', 'seca', 'artificial', 'despejado', false
+  1003, 103, 2025-04-03, 'Policia Cientifica Santa Fe', 'Ing. Lopez', 'Conductor con signos de somnolencia', 'fatiga', 'somnolencia', 'hormigon', 'humeda', 'artificial', 'lluvia', false
+  1004, 104, 2025-04-22, 'Agencia Vial Municipal', 'Lic. Perez', 'Vehiculo no respeto prioridad de paso', 'prioridad_paso', 'maniobra_indebida', 'asfalto', 'seca', 'diurna', 'despejado', true
+}
+
+LICENCIA = {
+  id_licencia:number, id_persona:number, nro_licencia:string, clase:string, fecha_emision:date, fecha_vencimiento:date, estado:string
+  1, 1, 'LIC-0001', 'B1', 2022-01-10, 2027-01-10, 'vigente'
+  2, 2, 'LIC-0002', 'B1', 2021-05-15, 2026-05-15, 'vigente'
+  3, 3, 'LIC-0003', 'A1', 2019-02-20, 2024-02-20, 'vencida'
+  4, 4, 'LIC-0004', 'C1', 2023-06-01, 2028-06-01, 'vigente'
+  5, 5, 'LIC-0005', 'B1', 2024-03-05, 2029-03-05, 'vigente'
+}
+
+INFRACCION = {
+  id_infraccion:number, id_persona:number, fecha:date, tipo_infraccion:string, descripcion:string, jurisdiccion:string, monto:number, estado:string
+  1, 1, 2024-10-10, 'exceso_velocidad', 'Superacion del limite en zona urbana', 'Buenos Aires', 45000, 'pagada'
+  2, 3, 2024-11-02, 'sin_casco', 'Circulacion sin casco reglamentario', 'CABA', 18000, 'pagada'
+  3, 3, 2025-01-18, 'luz_roja', 'Paso con semaforo en rojo', 'CABA', 52000, 'pendiente'
+  4, 5, 2024-07-07, 'estacionamiento_indebido', 'Vehiculo en zona prohibida', 'La Plata', 12000, 'pagada'
+}
+
+ANTECEDENTE_PENAL = {
+  id_antecedente:number, id_persona:number, fecha:date, caratula:string, organismo:string, observaciones:string
+  1, 3, 2023-08-18, 'Lesiones culposas en accidente vial', 'Juzgado Correccional 3', 'Causa en tramite'
+  2, 5, 2022-04-10, 'Resistencia a la autoridad', 'Fiscalia 2', 'Condena condicional'
+}
+
+HABILITACION_CONDUCCION = {
+  id_persona:number, patente:string, fecha_desde:date, fecha_hasta:date
+  1, 'AA111AA', 2024-01-01, 2030-12-31
+  2, 'AB222BB', 2024-01-01, 2030-12-31
+  3, 'AC333CC', 2024-01-01, 2030-12-31
+  4, 'AD444DD', 2024-01-01, 2030-12-31
+  5, 'AA111AA', 2025-01-01, 2030-12-31
+}
+
+VEHICULO_INVOLUCRADO = {
+  id_siniestro:number, patente:string, danio_material:string, observaciones:string
+  101, 'AA111AA', 'frontal_leve', 'Paracho y capot danados'
+  101, 'AB222BB', 'trasero_moderado', 'Paragolpe trasero destruido'
+  102, 'AC333CC', 'lateral_moderado', 'Carenado izquierdo danado'
+  103, 'AD444DD', 'frontal_grave', 'Motor y estructura comprometidos'
+  104, 'AA111AA', 'lateral_leve', 'Rayones en puerta delantera'
+  104, 'AC333CC', 'lateral_moderado', 'Espejo y carenado danados'
+}
+
+PARTICIPACION_VEHICULAR = {
+  id_siniestro:number, id_persona:number, patente:string, rol_ocupante:string, usa_cinturon:boolean, condicion_fisica:string, resultado:string
+  101, 1, 'AA111AA', 'conductor', true, 'lesiones_leves', 'ambulatorio'
+  101, 5, 'AA111AA', 'acompaniante', true, 'ileso', 'sin_internacion'
+  101, 2, 'AB222BB', 'conductor', false, 'lesiones_graves', 'internacion'
+  102, 3, 'AC333CC', 'conductor', false, 'lesiones_leves', 'ambulatorio'
+  103, 4, 'AD444DD', 'conductor', true, 'ileso', 'sin_internacion'
+  104, 1, 'AA111AA', 'conductor', true, 'ileso', 'sin_internacion'
+  104, 3, 'AC333CC', 'conductor', false, 'lesiones_leves', 'ambulatorio'
+}
+
+TESTIMONIO = {
+  id_siniestro:number, id_persona:number, declaracion:string, medio_contacto:string
+  101, 6, 'Observa frenada brusca y posterior choque', 'telefono'
+  102, 7, 'Declara que la moto circulaba rapido', 'email'
+  104, 9, 'Observa choque en bocacalle', 'telefono'
+}
+
+VICTIMA_NO_VEHICULAR = {
+  id_siniestro:number, id_persona:number, tipo_victima:string, condicion_fisica:string, observaciones:string
+  102, 8, 'peaton', 'lesiones_graves', 'Traslado en ambulancia al Hospital Ramos Mejia'
+}
+
+-- ============================================================
+-- CONSULTAS DE ALGEBRA RELACIONAL
+-- ============================================================
+
+-- Q1: Siniestros con descripcion del tramo vial
+Q1_siniestros_con_tramo = pi id_siniestro, fecha, hora, tipo_accidente, tipo_colision, descripcion, tipo_camino, jurisdiccion (SINIESTRO join TRAMO_VIAL)
+
+-- Q2: Vehiculos involucrados con su aseguradora
+Q2_vehiculos_con_aseguradora = pi id_siniestro, patente, marca, modelo, tipo_vehiculo, nombre (VEHICULO_INVOLUCRADO join VEHICULO join ASEGURADORA)
+
+-- Q3: Conductores que no usaban cinturon
+Q3_sin_cinturon = pi id_siniestro, nombre, apellido, patente, condicion_fisica, resultado (sigma usa_cinturon = false (PARTICIPACION_VEHICULAR join PERSONA))
+
+-- Q4: Siniestros con causa probable segun informe tecnico
+Q4_causas_probables = pi id_siniestro, fecha, causa_probable, falla_humana_probable, condicion_climatica (SINIESTRO join INFORME_TECNICO)
+
+-- Q5: Personas con infracciones pendientes de pago
+Q5_infracciones_pendientes = pi nombre, apellido, tipo_infraccion, monto (PERSONA join sigma estado = 'pendiente' (INFRACCION))
+
+-- Q6: Personas con antecedentes penales
+Q6_antecedentes = pi nombre, apellido, caratula, organismo (PERSONA join ANTECEDENTE_PENAL)
+
+-- Q7: Conductores con licencia vencida
+Q7_licencias_vencidas = pi nombre, apellido, nro_licencia, fecha_vencimiento (PERSONA join sigma estado = 'vencida' (LICENCIA))
+
+-- Q8: Siniestros ocurridos en autopista
+Q8_siniestros_autopista = pi id_siniestro, fecha, hora, referencia_lugar (SINIESTRO join sigma tipo_camino = 'autopista' (TRAMO_VIAL))
+
+-- Q9: Victimas no vehiculares con datos personales
+Q9_victimas = pi id_siniestro, nombre, apellido, tipo_victima, condicion_fisica (VICTIMA_NO_VEHICULAR join PERSONA)
+
+-- Q10: Motos involucradas en siniestros
+Q10_motos = pi id_siniestro, patente, marca, modelo, danio_material (VEHICULO_INVOLUCRADO join sigma tipo_vehiculo = 'moto' (VEHICULO))
+
+-- Q11: Testigos con datos de contacto
+Q11_testigos = pi id_siniestro, nombre, apellido, declaracion, medio_contacto (TESTIMONIO join PERSONA)
+
+-- Q12: Siniestros en condicion climatica de lluvia
+Q12_siniestros_lluvia = pi id_siniestro, fecha, organismo_emisor, causa_probable (SINIESTRO join sigma condicion_climatica = 'lluvia' (INFORME_TECNICO))
